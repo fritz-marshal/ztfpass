@@ -9,8 +9,8 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Install the package. Copy only the install inputs first for better layer caching.
-# (fastapi/uvicorn/requests/sshtunnel→paramiko→cryptography all ship manylinux
-# wheels, so no system build toolchain is needed on slim.)
+# (fastapi/uvicorn/paramiko→cryptography all ship manylinux wheels, so no system
+# build toolchain is needed on slim.)
 COPY pyproject.toml README.md ./
 COPY ztfpass ./ztfpass
 RUN pip install .
