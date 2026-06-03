@@ -4,6 +4,8 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_INPUT=1 \
+    PIP_PROGRESS_BAR=off \
     ZTFPASS_CONFIG=/config/config.yaml
 
 WORKDIR /app
