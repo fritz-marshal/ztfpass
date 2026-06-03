@@ -60,25 +60,35 @@ ztfpass --config config.yaml --host 0.0.0.0 --port 4000
 # or: python -m ztfpass --port 4000
 ```
 
-## Run (Docker — the deployment unit)
+## Run (Docker — the deployment unit, behind the existing traefik)
+
+`docker-compose.yaml` attaches ztfpass to the **traefik already running on the
+host** (the one fronting Kowalski) — no second proxy. Traefik terminates TLS
+(Let's Encrypt, `myhttpchallenge`) and routes a hostname to the container,
+mirroring Kowalski's labels (`websecure` entrypoint, service port 4000).
 
 ```
-cp config.example.yaml config.yaml      # fill in tunnel creds + bearer token(s)
-docker compose up -d --build            # serves on :4000
+cp config.example.yaml config.yaml      # tunnel creds + bearer token(s)
+# edit docker-compose.yaml: set the router Host(`...`) to your hostname
+docker compose up -d --build            # serves via traefik at https://<that host>
 ```
 
+- Joins the external `kowalski_kowalski` network so traefik can reach it; **no
+  host port is published** (external access is HTTPS via traefik only).
+- Needs DNS for the chosen hostname → this server, with `:80` reachable so the
+  ACME http-challenge can issue the cert on first request.
 - Secrets stay **out of the image**: `config.yaml` is mounted read-only at
-  runtime (`/config/config.yaml`). Alternatively, delete the volume and pass
-  secrets via `environment:` (`ZTF_MOUNTAIN_*`, `ZTFPASS_AUTH_TOKENS`).
-- Non-root user; built-in `HEALTHCHECK` hits `/healthz`.
-- Plain Docker equivalent:
-  ```
-  docker build -t ztfpass .
-  docker run -d -p 4000:4000 -v "$PWD/config.yaml:/config/config.yaml:ro" ztfpass
-  ```
+  runtime. Non-root user; built-in `HEALTHCHECK` hits `/healthz`.
+
+For a quick **standalone / localhost test** (no traefik, no TLS):
+```
+docker build -t ztfpass .
+docker run -d -p 4001:4000 -v "$PWD/config.yaml:/config/config.yaml:ro" ztfpass
+```
 
 Point SkyPortal's ZTF allocation at this service: set `app.ztf.protocol/host/port`
-(and the allocation `access_token`) so `ZTF_URL` resolves to ztfpass.
+to the ztfpass hostname (and keep the allocation `access_token`) so `ZTF_URL`
+resolves to ztfpass instead of Kowalski.
 
 ## Develop / test
 

@@ -1,19 +1,41 @@
-# Build + run the ZTF scheduler passthrough.
-#   cp config.example.yaml config.yaml   # fill in tunnel creds + bearer token(s)
+# Run ztfpass behind the EXISTING traefik on this host (the one already fronting
+# Kowalski) — no second proxy. Traefik terminates TLS (Let's Encrypt via the
+# `myhttpchallenge` resolver) and routes the ztfpass hostname to this container,
+# mirroring Kowalski's labels.
+#
+#   cp config.example.yaml config.yaml      # tunnel creds + bearer token(s)
+#   # set your hostname in the router rule below, then:
 #   docker compose up -d --build
 #
+# Requirements (already true on the Kowalski host):
+#   - the `kowalski_kowalski` docker network exists (Kowalski runs here)
+#   - DNS for the chosen Host(...) resolves to this server, and :80 is reachable
+#     (the ACME http-challenge issues the cert on first request)
+#
 # Secrets stay OUT of the image: config.yaml is mounted read-only at runtime.
-# (Alternatively, drop the volume and pass secrets via `environment:` —
-#  ZTF_MOUNTAIN_*, ZTFPASS_AUTH_TOKENS.)
+# No host port is published — traefik reaches ztfpass over the shared network.
 services:
   ztfpass:
     build: .
     image: ztfpass:latest
     container_name: ztfpass
-    ports:
-      - "4000:4000"
     environment:
       ZTFPASS_CONFIG: /config/config.yaml
     volumes:
       - ./config.yaml:/config/config.yaml:ro
+    networks:
+      - kowalski_kowalski
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ztfpass.entrypoints=websecure"
+      - "traefik.http.routers.ztfpass.rule=Host(`ztfpass.caltech.edu`)" # <-- set your hostname
+      - "traefik.http.routers.ztfpass.tls.certresolver=myhttpchallenge"
+      - "traefik.http.services.ztfpass.loadbalancer.server.port=4000"
+      # HTTP->HTTPS redirect is handled by the global `http_catchall` router
+      # Kowalski already defines; when Kowalski is retired, move that catchall
+      # (or put it in traefik's static config) so the redirect survives.
+
+networks:
+  kowalski_kowalski:
+    external: true
