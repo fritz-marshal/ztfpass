@@ -90,6 +90,47 @@ Point SkyPortal's ZTF allocation at this service: set `app.ztf.protocol/host/por
 to the ztfpass hostname (and keep the allocation `access_token`) so `ZTF_URL`
 resolves to ztfpass instead of Kowalski.
 
+## Deploy: systemd service + existing traefik (for old-Docker hosts)
+
+On the Kowalski host the Docker engine is too old to run modern (OCI) images, so
+ztfpass runs as a **systemd service in the conda env** and the **existing traefik
+routes to it via its file provider** — keeping `kowalski.caltech.edu` unchanged
+and running side-by-side with Kowalski (priority-100 router grabs only the
+trigger path). Files are in [`deploy/`](deploy/).
+
+**1. Install + start the service** (paths/User in the unit may need tweaking):
+```
+sudo cp deploy/ztfpass.service /etc/systemd/system/ztfpass.service
+sudo systemctl daemon-reload && sudo systemctl enable --now ztfpass
+journalctl -u ztfpass -f
+```
+It binds `0.0.0.0:4000` so the traefik container can reach it at the docker
+bridge gateway (`192.168.0.1`). Token auth gates it; also firewall `:4000` from
+the public interface so traefik (TLS) is the only front door.
+
+**2. Wire traefik to it** (edits to the *existing* traefik that fronts Kowalski —
+do carefully):
+- add to traefik's args/command: `--providers.file.directory=/dynamic` (keep
+  `--providers.docker=true`),
+- mount the dynamic config: `deploy/traefik-dynamic:/dynamic:ro`,
+- restart traefik (`docker compose up -d traefik` in its compose dir).
+
+[`deploy/traefik-dynamic/ztfpass.yml`](deploy/traefik-dynamic/ztfpass.yml) then
+defines the router (`Host(kowalski.caltech.edu) && PathPrefix(/api/triggers/ztf)`,
+`websecure`, `myhttpchallenge`, priority 100) → service `http://192.168.0.1:4000`.
+
+**3. Validate / cut over.** Once traefik reloads, SkyPortal's existing
+`…/api/triggers/ztf` calls hit ztfpass — no SkyPortal change. Rollback: stop the
+ztfpass service (or remove the dynamic file + reload traefik) and the path falls
+back to Kowalski.
+
+```
+curl -s -H "Authorization: Bearer $TOKEN" https://kowalski.caltech.edu/api/triggers/ztf | head -c 400
+```
+
+> The `docker-compose.yaml` path above is for hosts with a current Docker engine;
+> this systemd path is the one to use on the Kowalski box.
+
 ## Develop / test
 
 ```

@@ -1,0 +1,33 @@
+# Traefik dynamic (file-provider) config: route the ZTF trigger path on
+# kowalski.caltech.edu to the ztfpass systemd service running on the host.
+#
+# This keeps kowalski.caltech.edu unchanged (no SkyPortal/DNS/cert change) and
+# runs side-by-side with Kowalski: priority 100 grabs only /api/triggers/ztf for
+# ztfpass; everything else on that host stays with Kowalski's docker-provider
+# router.
+#
+# To use it, the EXISTING traefik needs the file provider enabled and this dir
+# mounted (see deploy notes in README):
+#   command/args:  --providers.file.directory=/dynamic   (keep --providers.docker=true)
+#   volume:        <this dir>:/dynamic:ro
+#
+# `192.168.0.1` is the kowalski_kowalski bridge gateway (i.e. the host as seen
+# from the traefik container — confirmed via `docker inspect`). ztfpass listens
+# on 0.0.0.0:4000 on the host, so traefik reaches it there.
+
+http:
+  routers:
+    ztfpass:
+      rule: "Host(`kowalski.caltech.edu`) && PathPrefix(`/api/triggers/ztf`)"
+      entryPoints:
+        - websecure
+      priority: 100
+      service: ztfpass
+      tls:
+        certResolver: myhttpchallenge
+
+  services:
+    ztfpass:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.0.1:4000"

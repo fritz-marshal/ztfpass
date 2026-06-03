@@ -1,0 +1,37 @@
+# systemd unit for ztfpass on the Kowalski host (no Docker — the host engine is
+# too old for modern images; the conda-env run is already proven to work).
+#
+# Install:
+#   sudo cp deploy/ztfpass.service /etc/systemd/system/ztfpass.service
+#   # adjust User / paths below if yours differ, then:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ztfpass
+#   systemctl status ztfpass
+#   journalctl -u ztfpass -f          # logs
+#
+# Adjust these to your host:
+#   User                = the account that owns the conda env + config.yaml
+#   WorkingDirectory    = the ztfpass checkout
+#   ZTFPASS_CONFIG      = path to the filled-in config.yaml (tunnel creds + tokens)
+#   ExecStart           = the `ztfpass` console script inside the conda env
+#
+# Binds 0.0.0.0:4000 so the traefik container can reach it via the docker bridge
+# gateway. Token auth gates it; also firewall :4000 from the public interface so
+# only traefik (TLS) is the front door.
+
+[Unit]
+Description=ztfpass — SkyPortal -> ZTF scheduler passthrough
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ztf_root
+WorkingDirectory=/scr/ztf_root/ztfpass
+Environment=ZTFPASS_CONFIG=/scr/ztf_root/ztfpass/config.yaml
+ExecStart=/data/ztf/anaconda3/envs/ztfpass/bin/ztfpass --host 0.0.0.0 --port 4000
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
