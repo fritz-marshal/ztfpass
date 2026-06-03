@@ -29,12 +29,16 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.ztfpass.entrypoints=websecure"
-      - "traefik.http.routers.ztfpass.rule=Host(`ztfpass.caltech.edu`)" # <-- set your hostname
+      # Keep kowalski.caltech.edu: a higher-priority router grabs ONLY the
+      # trigger path for ztfpass; everything else on that host stays with
+      # Kowalski. SkyPortal needs no change (its app.ztf.host is unchanged), and
+      # the host's existing Let's Encrypt cert is reused (no new DNS/cert).
+      - "traefik.http.routers.ztfpass.rule=Host(`kowalski.caltech.edu`) && PathPrefix(`/api/triggers/ztf`)"
+      - "traefik.http.routers.ztfpass.priority=100"
       - "traefik.http.routers.ztfpass.tls.certresolver=myhttpchallenge"
       - "traefik.http.services.ztfpass.loadbalancer.server.port=4000"
-      # HTTP->HTTPS redirect is handled by the global `http_catchall` router
-      # Kowalski already defines; when Kowalski is retired, move that catchall
-      # (or put it in traefik's static config) so the redirect survives.
+      # When Kowalski is fully retired, simplify this to just
+      # Host(`kowalski.caltech.edu`) (drop the PathPrefix) so ztfpass owns the host.
 
 networks:
   kowalski_kowalski:
