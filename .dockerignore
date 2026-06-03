@@ -1,0 +1,12 @@
+.git
+.gitignore
+.venv
+**/__pycache__
+*.pyc
+*.egg-info
+.pytest_cache
+.ruff_cache
+tests
+# never let secrets into the build context — config is mounted at runtime
+config.yaml
+.env

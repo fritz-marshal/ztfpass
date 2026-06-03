@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: lint + offline tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12" # match the Docker base image
+      - run: pip install -e ".[dev]"
+      - name: pre-commit (ruff + ruff-format + hygiene hooks)
+        run: pre-commit run --all-files --show-diff-on-failure
+      - name: pytest (offline — fake scheduler, no tunnel/network)
+        run: pytest
+
+  docker:
+    name: docker build + smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t ztfpass:ci .
+      - name: Smoke test (no config → app still serves; auth + health behave)
+        run: |
+          docker run -d --name ztfpass -p 4000:4000 ztfpass:ci
+          # wait for the service
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4000/healthz > /dev/null && break
+            sleep 2
+          done
+          echo "--- /healthz ---"
+          curl -sf http://localhost:4000/healthz || { docker logs ztfpass; exit 1; }
+          # unauthenticated API call must be rejected (401)
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4000/api/triggers/ztf)
+          echo "unauth GET /api/triggers/ztf -> $code"
+          if [ "$code" != "401" ]; then docker logs ztfpass; exit 1; fi
+      - name: Container logs (always)
+        if: always()
+        run: docker logs ztfpass || true

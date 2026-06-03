@@ -1,0 +1,20 @@
+# Copy to config.yaml (gitignored) and fill in, OR supply secrets via env vars
+# (ZTF_MOUNTAIN_*, ZTFPASS_AUTH_TOKENS). Mirrors Kowalski's config["ztf"].
+
+ztf:
+  mountain_ip:        # SSH host that reaches the ZTF scheduler (the "mountain")
+  mountain_port: 22
+  mountain_username:
+  mountain_password:
+  mountain_bind_ip: 127.0.0.1     # scheduler bind address on the far side of the tunnel
+  mountain_bind_port:             # scheduler port (the service serving /queues)
+
+scheduler:
+  path: /queues       # endpoint on the scheduler the tunnel forwards to
+  timeout: 10
+
+auth:
+  # Bearer token(s) SkyPortal sends as `Authorization: Bearer <token>`.
+  # This is the allocation `access_token` configured in SkyPortal.
+  tokens:
+    - CHANGE_ME

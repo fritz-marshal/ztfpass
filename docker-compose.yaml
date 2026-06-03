@@ -1,0 +1,19 @@
+# Build + run the ZTF scheduler passthrough.
+#   cp config.example.yaml config.yaml   # fill in tunnel creds + bearer token(s)
+#   docker compose up -d --build
+#
+# Secrets stay OUT of the image: config.yaml is mounted read-only at runtime.
+# (Alternatively, drop the volume and pass secrets via `environment:` —
+#  ZTF_MOUNTAIN_*, ZTFPASS_AUTH_TOKENS.)
+services:
+  ztfpass:
+    build: .
+    image: ztfpass:latest
+    container_name: ztfpass
+    ports:
+      - "4000:4000"
+    environment:
+      ZTFPASS_CONFIG: /config/config.yaml
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+    restart: unless-stopped
