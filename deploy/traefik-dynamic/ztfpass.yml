@@ -11,9 +11,12 @@
 #   command/args:  --providers.file.directory=/dynamic   (keep --providers.docker=true)
 #   volume:        <this dir>:/dynamic:ro
 #
-# `192.168.0.1` is the kowalski_kowalski bridge gateway (i.e. the host as seen
-# from the traefik container — confirmed via `docker inspect`). ztfpass listens
-# on 0.0.0.0:4000 on the host, so traefik reaches it there.
+# `192.168.30.136` is the host's LAN NIC (enp3s0f0) — a stable address, unlike the
+# kowalski_kowalski bridge gateway which docker reassigns on network recreation
+# (it drifted 192.168.0.1 -> 192.168.32.1 once and silently broke this route).
+# traefik reaches ztfpass (0.0.0.0:4000 on the host) only if the bridge interface
+# is trusted in firewalld: `firewall-cmd --zone=trusted --add-interface=br-<id>`
+# (the default `public` zone rejects container->host :4000).
 
 http:
   routers:
@@ -30,4 +33,4 @@ http:
     ztfpass:
       loadBalancer:
         servers:
-          - url: "http://192.168.0.1:4000"
+          - url: "http://192.168.30.136:4000"
